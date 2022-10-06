@@ -6,6 +6,10 @@ import com.example.note.error.ServiceException;
 import com.example.note.po.CoffeePo;
 import com.example.note.repository.CoffeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -15,7 +19,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static com.example.note.constant.CacheConst.COFFEE_CACHE_NAME;
+
 @Service
+@CacheConfig(cacheNames = COFFEE_CACHE_NAME)
 public class CoffeeService {
 
     @Autowired
@@ -26,6 +33,8 @@ public class CoffeeService {
      * @param coffeeDto
      * @return
      */
+    @Transactional
+    @CachePut(key = "#coffeeDto.name")
     public CoffeeDto addCoffee(CoffeeDto coffeeDto) {
         // 檢查名稱是否重複
         if (coffeeRepository.findByName(coffeeDto.getName()).isPresent())
@@ -40,6 +49,7 @@ public class CoffeeService {
      * 取得所有Coffee 資料
      * @return
      */
+    @Cacheable(key = "#root.methodName")
     public List<CoffeeDto> getAllCoffee() {
         return coffeeRepository.findAll().stream()
                 .map(CoffeeDto::createByPo)
@@ -51,6 +61,7 @@ public class CoffeeService {
      * @param name
      * @return
      */
+    @Cacheable(key = "#name")
     public CoffeeDto getCoffeeByName(String name) {
         return coffeeRepository.findByName(name)
                 .map(CoffeeDto::createByPo)
@@ -62,16 +73,15 @@ public class CoffeeService {
      * @param coffeeDto
      * @return
      */
+    @Transactional
+    @CachePut(key = "#result.name")
     public CoffeeDto editCoffee(CoffeeDto coffeeDto) {
         // 根據指定名稱取得一筆Coffee 資料
-        Optional<CoffeePo> optional = coffeeRepository.findByName(coffeeDto.getName());
-
-        // 檢查資料是否存在
-        if (!optional.isPresent())
-            throw new ServiceException(ResponseEnum.DATA_NOT_FOUND);
+        CoffeePo coffeePo = coffeeRepository.findByName(coffeeDto.getName())
+                .orElseThrow(() -> new ServiceException(ResponseEnum.DATA_NOT_FOUND));
 
         // 更新一筆Coffee 資料
-        return updateCoffee(optional.get(), coffeePo -> {
+        return updateCoffee(coffeePo, po -> {
             if (StringUtils.hasText(coffeeDto.getProductionPlace()))
                 coffeePo.setProductionPlace(coffeeDto.getProductionPlace());
             if (StringUtils.hasText(coffeeDto.getDescription()))
@@ -99,6 +109,7 @@ public class CoffeeService {
      * @param name
      */
     @Transactional
+    @CacheEvict(key = "#name")
     public void removeCoffee(String name) {
         // 根據指定名稱取得一筆Coffee 資料
         Optional<CoffeePo> optional = coffeeRepository.findByName(name);

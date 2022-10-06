@@ -1,5 +1,6 @@
 package com.example.note.aop;
 
+import com.example.note.util.JsonUtil;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.*;
@@ -7,11 +8,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 @Component
 @Aspect
-public class LogAspect {
+public class LoggerAspect {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(LogAspect.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoggerAspect.class);
 
     @Pointcut("execution(* com.example.note.controller..*(..)) || execution(* com.example.note.service..*(..))")
     public void pointcut() {
@@ -19,7 +23,7 @@ public class LogAspect {
 
     @Before("pointcut()")
     public void before(JoinPoint joinPoint) {
-        LOGGER.info("Starting: {}.{}()", getClassName(joinPoint), getMethodName(joinPoint));
+        LOGGER.info("Starting: {}.{}({})", getClassName(joinPoint), getMethodName(joinPoint), getArgs(joinPoint));
     }
 
     @After("pointcut()")
@@ -51,6 +55,13 @@ public class LogAspect {
 
     private String getMethodName(JoinPoint joinPoint) {
         return joinPoint.getSignature().getName();
+    }
+
+    private String getArgs(JoinPoint joinPoint) {
+        return Arrays.stream(joinPoint.getArgs())
+                .filter(e -> !(e instanceof byte[]))
+                .map(JsonUtil::convertObjectToJsonString)
+                .collect(Collectors.joining(", "));
     }
 
 }
